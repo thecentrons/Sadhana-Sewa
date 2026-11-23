@@ -1,0 +1,273 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidCode(code) {
+      return code is string && code.size() >= 4 && code.size() <= 12 && code.matches('^[A-Z0-9]+$');
+    }
+
+    function isValidDateKey(val) {
+      return val is string && val.size() == 10 && val.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.email is string && data.email.size() <= 120 &&
+        data.role in ['DEVOTEE', 'COUNSELLOR'] &&
+        data.inviteCode is string && data.inviteCode.size() <= 12 &&
+        data.whatsappPhone is string && data.whatsappPhone.size() <= 24 &&
+        data.counsellorUid is string && data.counsellorUid.size() <= 128 &&
+        data.counsellorName is string && data.counsellorName.size() <= 80 &&
+        data.counsellorWhatsapp is string && data.counsellorWhatsapp.size() <= 24 &&
+        data.bookReadingTargetMinutes is int && data.bookReadingTargetMinutes >= 30 && data.bookReadingTargetMinutes <= 2400 &&
+        data.personalHearingTargetMinutes is int && data.personalHearingTargetMinutes >= 30 && data.personalHearingTargetMinutes <= 1800 &&
+        data.studyDailyTargetMinutes is int && data.studyDailyTargetMinutes >= 15 && data.studyDailyTargetMinutes <= 720 &&
+        data.japaRoundsTarget is int && data.japaRoundsTarget >= 1 && data.japaRoundsTarget <= 64 &&
+        data.readingTierLabel is string && data.readingTierLabel.size() >= 1 && data.readingTierLabel.size() <= 40;
+    }
+
+    function isValidInviteCode(data) {
+      return isValidCode(data.code) &&
+        data.counsellorUid is string && data.counsellorUid.size() >= 1 && data.counsellorUid.size() <= 128 &&
+        data.counsellorName is string && data.counsellorName.size() >= 1 && data.counsellorName.size() <= 80 &&
+        data.counsellorWhatsapp is string && data.counsellorWhatsapp.size() <= 24;
+    }
+
+    function isValidSadhanaLog(data) {
+      return data.devoteeUid is string && data.devoteeUid.size() >= 1 && data.devoteeUid.size() <= 128 &&
+        data.counsellorUid is string && data.counsellorUid.size() <= 128 &&
+        isValidDateKey(data.dateKey) &&
+        isValidDateKey(data.weekStartKey) &&
+        data.morningProgramAttended is bool &&
+        data.chantingSlot in ['BEFORE_730', 'BEFORE_930', 'BEFORE_1200', 'BEFORE_1600', 'BEFORE_1900', 'AFTER_1900'] &&
+        data.japaRounds is int && data.japaRounds >= 0 && data.japaRounds <= 128 &&
+        data.japaBeads is int && data.japaBeads >= 0 && data.japaBeads <= 108 &&
+        data.bookReadingMinutes is int && data.bookReadingMinutes >= 0 && data.bookReadingMinutes <= 1440 &&
+        data.bookTitle is string && data.bookTitle.size() <= 120 &&
+        data.morningClassAttended is bool &&
+        data.personalHearingMinutes is int && data.personalHearingMinutes >= 0 && data.personalHearingMinutes <= 1440 &&
+        data.shlokaLearned is bool &&
+        data.shlokaNote is string && data.shlokaNote.size() <= 500 &&
+        data.studyMinutes is int && data.studyMinutes >= 0 && data.studyMinutes <= 1440 &&
+        data.toBedSlot in ['BEFORE_2115', 'BEFORE_2130', 'BEFORE_2145', 'BEFORE_2200', 'AFTER_2200'] &&
+        data.wakeUpSlot in ['BEFORE_0340', 'BEFORE_0350', 'BEFORE_0400', 'BEFORE_0415', 'AFTER_0415'] &&
+        data.dayRestSlot in ['UNDER_30', 'FROM_30_TO_45', 'FROM_45_TO_60', 'OVER_60'] &&
+        data.cardFilledOnTime is bool &&
+        data.sevaMinutes is int && data.sevaMinutes >= 0 && data.sevaMinutes <= 1440 &&
+        data.sevaNote is string && data.sevaNote.size() <= 500;
+    }
+
+    function isValidWeeklyFeedback(data) {
+      return data.devoteeUid is string && data.devoteeUid.size() >= 1 && data.devoteeUid.size() <= 128 &&
+        data.counsellorUid is string && data.counsellorUid.size() >= 1 && data.counsellorUid.size() <= 128 &&
+        data.counsellorName is string && data.counsellorName.size() >= 1 && data.counsellorName.size() <= 80 &&
+        isValidDateKey(data.weekStartKey) &&
+        data.blessingTag is string && data.blessingTag.size() <= 60 &&
+        data.note is string && data.note.size() >= 1 && data.note.size() <= 1000;
+    }
+
+    // 1. User Profiles (Devotees & Counsellors)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) &&
+        (request.auth.uid == userId || existing().counsellorUid == request.auth.uid);
+
+      // Counsellor lists only their assigned devotees via whereEqualTo("counsellorUid", uid)
+      allow list: if isSignedIn() && existing().counsellorUid == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        incoming().uid == request.auth.uid &&
+        incoming().keys().hasAll([
+          'uid', 'displayName', 'email', 'role', 'inviteCode', 'whatsappPhone',
+          'counsellorUid', 'counsellorName', 'counsellorWhatsapp',
+          'bookReadingTargetMinutes', 'personalHearingTargetMinutes',
+          'studyDailyTargetMinutes', 'japaRoundsTarget', 'readingTierLabel',
+          'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'uid', 'displayName', 'email', 'role', 'inviteCode', 'whatsappPhone',
+          'counsellorUid', 'counsellorName', 'counsellorWhatsapp',
+          'bookReadingTargetMinutes', 'personalHearingTargetMinutes',
+          'studyDailyTargetMinutes', 'japaRoundsTarget', 'readingTierLabel',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidUserProfile(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().role == existing().role &&
+        incoming().inviteCode == existing().inviteCode &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        (
+          // Action 1: Owner updates own name, WhatsApp, or counsellor link (CANNOT self-modify spiritual targets)
+          (
+            request.auth.uid == userId &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'whatsappPhone', 'counsellorUid', 'counsellorName', 'counsellorWhatsapp', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Assigned Counsellor exclusively sets devotee's Reading, Hearing, Study, and Japa targets
+          (
+            existing().role == 'DEVOTEE' &&
+            existing().counsellorUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'bookReadingTargetMinutes', 'personalHearingTargetMinutes',
+              'studyDailyTargetMinutes', 'japaRoundsTarget', 'readingTierLabel', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // 2. Counsellor Invite Codes (Direct lookup only, listing strictly denied)
+    match /inviteCodes/{code} {
+      allow get: if isSignedIn() && isValidCode(code);
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+        isValidCode(code) &&
+        incoming().code == code &&
+        incoming().counsellorUid == request.auth.uid &&
+        incoming().keys().hasAll(['code', 'counsellorUid', 'counsellorName', 'counsellorWhatsapp', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['code', 'counsellorUid', 'counsellorName', 'counsellorWhatsapp', 'createdAt', 'updatedAt']) &&
+        isValidInviteCode(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow update: if isSignedIn() &&
+        isValidCode(code) &&
+        existing().counsellorUid == request.auth.uid &&
+        isValidInviteCode(incoming()) &&
+        incoming().code == existing().code &&
+        incoming().counsellorUid == existing().counsellorUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['counsellorName', 'counsellorWhatsapp', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidCode(code) && existing().counsellorUid == request.auth.uid;
+    }
+
+    // 3. Daily Sadhana Logs (Devotee writes, Assigned Counsellor reads)
+    match /sadhanaLogs/{logId} {
+      allow get: if isSignedIn() && isValidId(logId) &&
+        (existing().devoteeUid == request.auth.uid || existing().counsellorUid == request.auth.uid);
+
+      allow list: if isSignedIn() &&
+        (existing().devoteeUid == request.auth.uid || existing().counsellorUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        isValidId(logId) &&
+        incoming().devoteeUid == request.auth.uid &&
+        incoming().keys().hasAll([
+          'devoteeUid', 'counsellorUid', 'dateKey', 'weekStartKey',
+          'morningProgramAttended', 'chantingSlot', 'japaRounds', 'japaBeads',
+          'bookReadingMinutes', 'bookTitle', 'morningClassAttended',
+          'personalHearingMinutes', 'shlokaLearned', 'shlokaNote',
+          'studyMinutes', 'toBedSlot', 'wakeUpSlot', 'dayRestSlot',
+          'cardFilledOnTime', 'sevaMinutes', 'sevaNote',
+          'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'devoteeUid', 'counsellorUid', 'dateKey', 'weekStartKey',
+          'morningProgramAttended', 'chantingSlot', 'japaRounds', 'japaBeads',
+          'bookReadingMinutes', 'bookTitle', 'morningClassAttended',
+          'personalHearingMinutes', 'shlokaLearned', 'shlokaNote',
+          'studyMinutes', 'toBedSlot', 'wakeUpSlot', 'dayRestSlot',
+          'cardFilledOnTime', 'sevaMinutes', 'sevaNote',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidSadhanaLog(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(logId) &&
+        existing().devoteeUid == request.auth.uid &&
+        isValidSadhanaLog(incoming()) &&
+        incoming().devoteeUid == existing().devoteeUid &&
+        incoming().dateKey == existing().dateKey &&
+        incoming().weekStartKey == existing().weekStartKey &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'counsellorUid', 'morningProgramAttended', 'chantingSlot', 'japaRounds', 'japaBeads',
+          'bookReadingMinutes', 'bookTitle', 'morningClassAttended',
+          'personalHearingMinutes', 'shlokaLearned', 'shlokaNote',
+          'studyMinutes', 'toBedSlot', 'wakeUpSlot', 'dayRestSlot',
+          'cardFilledOnTime', 'sevaMinutes', 'sevaNote', 'updatedAt'
+        ]);
+
+      allow delete: if isSignedIn() && isValidId(logId) && existing().devoteeUid == request.auth.uid;
+    }
+
+    // 4. Weekly Counsellor Feedback (Assigned Counsellor writes, Devotee reads)
+    match /weeklyFeedback/{feedbackId} {
+      allow get: if isSignedIn() && isValidId(feedbackId) &&
+        (existing().devoteeUid == request.auth.uid || existing().counsellorUid == request.auth.uid);
+
+      allow list: if isSignedIn() &&
+        (existing().devoteeUid == request.auth.uid || existing().counsellorUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        isValidId(feedbackId) &&
+        incoming().counsellorUid == request.auth.uid &&
+        incoming().keys().hasAll([
+          'devoteeUid', 'counsellorUid', 'counsellorName', 'weekStartKey',
+          'blessingTag', 'note', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'devoteeUid', 'counsellorUid', 'counsellorName', 'weekStartKey',
+          'blessingTag', 'note', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidWeeklyFeedback(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        exists(/databases/$(database)/documents/users/$(incoming().devoteeUid)) &&
+        get(/databases/$(database)/documents/users/$(incoming().devoteeUid)).data.counsellorUid == request.auth.uid;
+
+      allow update: if isSignedIn() &&
+        isValidId(feedbackId) &&
+        existing().counsellorUid == request.auth.uid &&
+        isValidWeeklyFeedback(incoming()) &&
+        incoming().devoteeUid == existing().devoteeUid &&
+        incoming().counsellorUid == existing().counsellorUid &&
+        incoming().weekStartKey == existing().weekStartKey &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'counsellorName', 'blessingTag', 'note', 'updatedAt'
+        ]);
+
+      allow delete: if isSignedIn() && isValidId(feedbackId) && existing().counsellorUid == request.auth.uid;
+    }
+  }
+}

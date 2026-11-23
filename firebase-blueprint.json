@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Devotee or Counsellor profile with counsellor-governed spiritual targets.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID matching document ID." },
+        "displayName": { "type": "string", "description": "Display name shown on cards and roster." },
+        "email": { "type": "string", "description": "Google account email address." },
+        "role": { "type": "string", "enum": ["DEVOTEE", "COUNSELLOR"], "description": "Immutable account role selected during onboarding." },
+        "inviteCode": { "type": "string", "description": "Unique 6-character code generated for Counsellors." },
+        "whatsappPhone": { "type": "string", "description": "Counsellor WhatsApp number with country code." },
+        "counsellorUid": { "type": "string", "description": "Linked counsellor UID for devotees, or empty string when unlinked." },
+        "counsellorName": { "type": "string", "description": "Display name of linked counsellor." },
+        "counsellorWhatsapp": { "type": "string", "description": "WhatsApp number of linked counsellor." },
+        "bookReadingTargetMinutes": { "type": "integer", "description": "Weekly book reading target in minutes, editable only by assigned counsellor." },
+        "personalHearingTargetMinutes": { "type": "integer", "description": "Weekly personal hearing target in minutes, editable only by assigned counsellor." },
+        "studyDailyTargetMinutes": { "type": "integer", "description": "Daily study target in minutes, editable only by assigned counsellor." },
+        "japaRoundsTarget": { "type": "integer", "description": "Daily Japa rounds target, editable only by assigned counsellor." },
+        "readingTierLabel": { "type": "string", "description": "Label such as Bhima (6h), Arjuna (5h), or Custom." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email",
+        "role",
+        "inviteCode",
+        "whatsappPhone",
+        "counsellorUid",
+        "counsellorName",
+        "counsellorWhatsapp",
+        "bookReadingTargetMinutes",
+        "personalHearingTargetMinutes",
+        "studyDailyTargetMinutes",
+        "japaRoundsTarget",
+        "readingTierLabel",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InviteCodeRecord": {
+      "title": "InviteCodeRecord",
+      "description": "Lookup record mapping a counsellor invite code to their UID and contact info.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Uppercase alphanumeric counsellor invite code." },
+        "counsellorUid": { "type": "string", "description": "Owner counsellor UID." },
+        "counsellorName": { "type": "string", "description": "Counsellor display name." },
+        "counsellorWhatsapp": { "type": "string", "description": "Counsellor WhatsApp number." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["code", "counsellorUid", "counsellorName", "counsellorWhatsapp", "createdAt", "updatedAt"]
+    },
+    "DailySadhanaLog": {
+      "title": "DailySadhanaLog",
+      "description": "Single day sadhana record synced on demand from local Room storage.",
+      "type": "object",
+      "properties": {
+        "devoteeUid": { "type": "string", "description": "Devotee owner UID." },
+        "counsellorUid": { "type": "string", "description": "Denormalized assigned counsellor UID for read-only counsellor access." },
+        "dateKey": { "type": "string", "description": "ISO date yyyy-MM-dd." },
+        "weekStartKey": { "type": "string", "description": "Monday ISO date yyyy-MM-dd of the week." },
+        "morningProgramAttended": { "type": "boolean" },
+        "chantingSlot": { "type": "string", "enum": ["BEFORE_730", "BEFORE_930", "BEFORE_1200", "BEFORE_1600", "BEFORE_1900", "AFTER_1900"] },
+        "japaRounds": { "type": "integer" },
+        "japaBeads": { "type": "integer" },
+        "bookReadingMinutes": { "type": "integer" },
+        "bookTitle": { "type": "string" },
+        "morningClassAttended": { "type": "boolean" },
+        "personalHearingMinutes": { "type": "integer" },
+        "shlokaLearned": { "type": "boolean" },
+        "shlokaNote": { "type": "string" },
+        "studyMinutes": { "type": "integer" },
+        "toBedSlot": { "type": "string", "enum": ["BEFORE_2115", "BEFORE_2130", "BEFORE_2145", "BEFORE_2200", "AFTER_2200"] },
+        "wakeUpSlot": { "type": "string", "enum": ["BEFORE_0340", "BEFORE_0350", "BEFORE_0400", "BEFORE_0415", "AFTER_0415"] },
+        "dayRestSlot": { "type": "string", "enum": ["UNDER_30", "FROM_30_TO_45", "FROM_45_TO_60", "OVER_60"] },
+        "cardFilledOnTime": { "type": "boolean" },
+        "sevaMinutes": { "type": "integer" },
+        "sevaNote": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": [
+        "devoteeUid",
+        "counsellorUid",
+        "dateKey",
+        "weekStartKey",
+        "morningProgramAttended",
+        "chantingSlot",
+        "japaRounds",
+        "japaBeads",
+        "bookReadingMinutes",
+        "bookTitle",
+        "morningClassAttended",
+        "personalHearingMinutes",
+        "shlokaLearned",
+        "shlokaNote",
+        "studyMinutes",
+        "toBedSlot",
+        "wakeUpSlot",
+        "dayRestSlot",
+        "cardFilledOnTime",
+        "sevaMinutes",
+        "sevaNote",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WeeklyFeedback": {
+      "title": "WeeklyFeedback",
+      "description": "Counsellor encouragement note attached to a devotee weekly Sadhana Card.",
+      "type": "object",
+      "properties": {
+        "devoteeUid": { "type": "string" },
+        "counsellorUid": { "type": "string" },
+        "counsellorName": { "type": "string" },
+        "weekStartKey": { "type": "string" },
+        "blessingTag": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["devoteeUid", "counsellorUid", "counsellorName", "weekStartKey", "blessingTag", "note", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Devotee and Counsellor profiles with role-gated target governance."
+    },
+    "/inviteCodes/{code}": {
+      "schema": { "$ref": "#/entities/InviteCodeRecord" },
+      "description": "Direct-get counsellor invite code directory (listing disabled)."
+    },
+    "/sadhanaLogs/{logId}": {
+      "schema": { "$ref": "#/entities/DailySadhanaLog" },
+      "description": "Daily sadhana check-in records keyed by {devoteeUid}_{yyyyMMdd}."
+    },
+    "/weeklyFeedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/WeeklyFeedback" },
+      "description": "Counsellor weekly feedback keyed by {devoteeUid}_{weekStartKey}."
+    }
+  }
+}

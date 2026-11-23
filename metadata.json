@@ -1,0 +1,6 @@
+{
+  "name": "Sadhana Seva",
+  "description": "Offline-first ISKCON daily sadhana tracker with Focus Japa chanting, Book Reading timer, counsellor-set proportional scoring, smart follow-up reminders, and direct WhatsApp sharing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Sadhana Seva</string>
+    <string name="app_tagline">Daily Devotional Consistency &amp; Counsellor Guidance</string>
+    <string name="maha_mantra_line_1">Hare Krishna Hare Krishna</string>
+    <string name="maha_mantra_line_2">Krishna Krishna Hare Hare</string>
+    <string name="maha_mantra_line_3">Hare Rama Hare Rama</string>
+    <string name="maha_mantra_line_4">Rama Rama Hare Hare</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="reminder_channel_name">Daily Sadhana Reminders</string>
+    <string name="reminder_channel_desc">Gentle daily check-in and follow-up reminders when today\'s sadhana card is still pending.</string>
+</resources>
