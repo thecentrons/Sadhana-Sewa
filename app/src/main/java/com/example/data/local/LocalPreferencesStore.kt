@@ -35,6 +35,7 @@ class LocalPreferencesStore(private val context: Context) {
         val TARGET_STUDY_MIN = intPreferencesKey("target_study_min")
         val TARGET_JAPA_ROUNDS = intPreferencesKey("target_japa_rounds")
         val TARGET_READING_LABEL = stringPreferencesKey("target_reading_label")
+        val LAST_PROFILE_SYNC_MILLIS = longPreferencesKey("last_profile_sync_millis")
 
         // Offline Japa & Book Reading Timer State
         val JAPA_DATE_KEY = stringPreferencesKey("japa_date_key")
@@ -103,7 +104,15 @@ class LocalPreferencesStore(private val context: Context) {
             prefs[Keys.TARGET_STUDY_MIN] = profile.studyDailyTargetMinutes
             prefs[Keys.TARGET_JAPA_ROUNDS] = profile.japaRoundsTarget
             prefs[Keys.TARGET_READING_LABEL] = profile.readingTierLabel
+            prefs[Keys.LAST_PROFILE_SYNC_MILLIS] = System.currentTimeMillis()
         }
+    }
+
+    suspend fun isProfileCacheFresh(uid: String, maxAgeMillis: Long = 12L * 60L * 60L * 1000L): Boolean {
+        val prefs = context.sadhanaDataStore.data.first()
+        if (prefs[Keys.ACTIVE_UID] != uid) return false
+        val lastSync = prefs[Keys.LAST_PROFILE_SYNC_MILLIS] ?: 0L
+        return lastSync > 0L && (System.currentTimeMillis() - lastSync) < maxAgeMillis
     }
 
     suspend fun getCachedUserProfile(uid: String): UserProfile? {
@@ -132,6 +141,7 @@ class LocalPreferencesStore(private val context: Context) {
         context.sadhanaDataStore.edit { prefs ->
             prefs.remove(Keys.ACTIVE_UID)
             prefs.remove(Keys.CACHED_ROLE)
+            prefs.remove(Keys.LAST_PROFILE_SYNC_MILLIS)
         }
     }
 

@@ -56,10 +56,11 @@ jobs:
               echo "AI Studio excludes \`app/google-services.json\` when pushing to GitHub."
               echo ""
               echo "**Fix (takes 30 seconds):**"
-              echo "1. Open your project in Firebase Console -> Project Settings -> Download \`google-services.json\` (or copy it from \`app/google-services.json\` in AI Studio's code editor)."
-              echo "2. In GitHub, go to **Settings -> Secrets and variables -> Actions -> New repository secret**."
-              echo "3. Name: \`GOOGLE_SERVICES_JSON\` and paste the entire JSON content as the value."
-              echo "4. Re-run this workflow!"
+              echo "1. Open \`app/google-services.json\` in AI Studio's code editor and copy the ENTIRE file (from \`{\` to \`}\`)."
+              echo "2. In GitHub, go to **Settings -> Secrets and variables -> Actions**."
+              echo "3. Under **Repository secrets** (NOT Environment secrets), click **New repository secret**."
+              echo "4. Exact Name: \`GOOGLE_SERVICES_JSON\` and paste the JSON content as the value."
+              echo "5. Re-run this workflow!"
             } >> "$GITHUB_STEP_SUMMARY"
             echo "ERROR: app/google-services.json is missing. Add GitHub Secret GOOGLE_SERVICES_JSON and re-run."
             exit 1
@@ -110,12 +111,14 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          {
-            echo "### Build Failure Tail"
-            echo '```text'
-            tail -n 60 /tmp/gradle-build.log || true
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/gradle-build.log ]; then
+            {
+              echo "### Gradle Build Failure Tail"
+              echo '```text'
+              tail -n 60 /tmp/gradle-build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Rename APK for easy sharing
         run: |

@@ -61,12 +61,15 @@ class SessionViewModel(
     fun loadProfile() {
         viewModelScope.launch {
             _state.value = SessionUiState.Loading
-            // Offline-first: immediately check local cache so app works with zero internet
+            // Offline-first: immediately check local cache so app works with zero internet & zero reads
             val cached = repository.getCachedProfile(uid)
             if (cached != null) {
                 _state.value = SessionUiState.Ready(cached)
+                if (repository.isProfileCacheFresh(uid)) {
+                    return@launch
+                }
             }
-            // One-shot cloud check (no realtime listener)
+            // One-shot cloud check only on first login or when cache is >12h old (no realtime listener)
             repository.fetchUserProfileOnce(uid)
                 .onSuccess { remote ->
                     if (remote != null) {
@@ -282,8 +285,23 @@ class DevoteeViewModel(
                 }
             }
         }
-        // Single one-shot cloud refresh on startup (zero realtime listeners!)
-        refreshFromCloud(silent = true)
+        // Ultra-low-cost startup: pushes pending logs, pulls history ONLY on fresh install (0 reads normally!)
+        syncOnStartup()
+    }
+
+    private fun syncOnStartup() {
+        viewModelScope.launch {
+            repository.syncDevoteeOnStartup(uid)
+                .onSuccess { (freshProfile, freshFeedbacks) ->
+                    if (freshProfile != null) {
+                        _profile.value = freshProfile
+                        onProfileRefreshed(freshProfile)
+                    }
+                    if (freshFeedbacks != null) {
+                        _feedbacks.value = freshFeedbacks.associateBy { it.weekStartKey }
+                    }
+                }
+        }
     }
 
     fun updateProfile(profile: UserProfile) {

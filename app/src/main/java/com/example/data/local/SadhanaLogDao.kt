@@ -34,4 +34,7 @@ interface SadhanaLogDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM local_sadhana_logs WHERE devoteeUid = :uid AND dateKey = :dateKey)")
     suspend fun hasLogForDate(uid: String, dateKey: String): Boolean
+
+    @Query("SELECT COUNT(*) FROM local_sadhana_logs WHERE devoteeUid = :uid")
+    suspend fun countLogsForDevotee(uid: String): Int
 }

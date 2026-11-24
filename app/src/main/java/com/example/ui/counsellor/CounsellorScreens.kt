@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import com.example.domain.SadhanaScoringEngine
 import com.example.domain.SadhanaTargets
 import com.example.domain.UserProfile
+import com.example.ui.components.ServerAndUpdateSettingsCard
 import com.example.ui.components.WeeklySadhanaCardView
 import com.example.ui.components.scoreColorForPercent
 import com.example.viewmodel.CounsellorUiState
@@ -747,6 +748,10 @@ fun CounsellorProfileScreen(
                         }
                     }
                 }
+            }
+
+            item {
+                ServerAndUpdateSettingsCard()
             }
 
             item {

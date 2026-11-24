@@ -77,6 +77,7 @@ import androidx.core.content.ContextCompat
 import com.example.domain.ReminderSettings
 import com.example.domain.SadhanaScoringEngine
 import com.example.domain.WeeklySadhanaSummary
+import com.example.ui.components.ServerAndUpdateSettingsCard
 import com.example.ui.components.WeeklySadhanaCardView
 import com.example.ui.components.scoreColorForPercent
 import com.example.ui.theme.DevotionalSuccess
@@ -801,6 +802,11 @@ fun DevoteeProfileScreen(
                         }
                     }
                 }
+            }
+
+            // Server & App Update Settings Card
+            item {
+                ServerAndUpdateSettingsCard()
             }
 
             // Sync & Sign Out

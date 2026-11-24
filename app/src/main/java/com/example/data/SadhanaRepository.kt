@@ -1,10 +1,10 @@
 package com.example.data
 
 import android.content.Context
-import com.example.R
 import com.example.data.local.LocalPreferencesStore
 import com.example.data.local.LocalSadhanaLogEntity
 import com.example.data.local.SadhanaDatabase
+import com.example.data.local.ServerConfigStore
 import com.example.data.remote.OperationType
 import com.example.data.remote.handleFirestoreError
 import com.example.domain.DailySadhanaLog
@@ -35,14 +35,17 @@ data class SyncOutcome(
 
 class SadhanaRepository(
     context: Context,
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(
-        context.applicationContext.getString(R.string.firestore_database_id)
-    )
+    private val overrideDb: FirebaseFirestore? = null
 ) {
     private val appContext = context.applicationContext
     private val auth = Firebase.auth
     private val dao = SadhanaDatabase.getInstance(appContext).sadhanaLogDao()
     val prefs = LocalPreferencesStore(appContext)
+
+    private val db: FirebaseFirestore
+        get() = overrideDb ?: FirebaseFirestore.getInstance(
+            ServerConfigStore.getActiveDatabaseId(appContext)
+        )
 
     private fun requireUserId(): String =
         auth.currentUser?.uid
@@ -60,6 +63,9 @@ class SadhanaRepository(
     val reminderSettings: Flow<ReminderSettings> = prefs.reminderSettings
 
     suspend fun getCachedProfile(uid: String): UserProfile? = prefs.getCachedUserProfile(uid)
+
+    suspend fun isProfileCacheFresh(uid: String, maxAgeMillis: Long = 12L * 60L * 60L * 1000L): Boolean =
+        prefs.isProfileCacheFresh(uid, maxAgeMillis)
 
     suspend fun clearLocalSessionCache() {
         prefs.clearCachedUser()
@@ -355,6 +361,39 @@ class SadhanaRepository(
         }
         val remaining = dao.getUnsyncedLogs(devoteeUid).size
         return SyncOutcome(syncedCount = synced, remainingUnsynced = remaining, errorMessage = lastError)
+    }
+
+    /**
+     * Ultra-low-cost startup sync for Devotee:
+     * - Always pushes pending unsynced local logs (0 ops if none pending).
+     * - ONLY pulls full cloud history automatically when local Room DB is empty (fresh install / new device).
+     * - Otherwise skips reading historical sadhanaLogs on app launch (0 reads!) and only refreshes
+     *   the 1-document user profile if cache is older than 12 hours.
+     */
+    suspend fun syncDevoteeOnStartup(uid: String): Result<Pair<UserProfile?, List<WeeklyFeedback>?>> {
+        return try {
+            requireUserId()
+            // 1. Push any offline pending check-ins first (0 ops if none pending)
+            syncPendingLogs(uid)
+
+            // 2. Fresh install / switched device? Pull cloud history once into local Room DB
+            val localCount = dao.countLogsForDevotee(uid)
+            if (localCount == 0) {
+                return refreshDevoteeFromCloud(uid).map { (profile, feedbacks) -> profile to feedbacks }
+            }
+
+            // 3. Normal daily app open: 0 reads if profile cache is fresh (<12h), else 1 read for profile
+            val freshProfile = if (prefs.isProfileCacheFresh(uid)) {
+                null
+            } else {
+                fetchUserProfileOnce(uid).getOrNull()
+            }
+            Result.success(freshProfile to null)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /**

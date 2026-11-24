@@ -20,8 +20,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
@@ -35,9 +39,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,10 +54,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.data.local.ServerConfigStore
 import com.example.domain.SadhanaScoringEngine
 import com.example.domain.WeeklyFeedback
 import com.example.domain.WeeklySadhanaSummary
@@ -673,3 +681,167 @@ fun WhatsAppComposerSheet(
         }
     }
 }
+
+@Composable
+fun ServerAndUpdateSettingsCard(
+    onStatusMessage: (String) -> Unit = {}
+) {
+    val context = LocalContext.current
+    var config by remember { mutableStateOf(ServerConfigStore.getConfig(context)) }
+    var expanded by remember { mutableStateOf(false) }
+    var dbIdInput by remember(config) { mutableStateOf(config.customDatabaseId) }
+    var updateUrlInput by remember(config) { mutableStateOf(config.updateLink) }
+    var statusNotice by remember { mutableStateOf<String?>(null) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        imageVector = Icons.Filled.Cloud,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Cloud Server & App Updates",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = if (config.isUsingCustomDatabase) {
+                                "Custom DB active"
+                            } else {
+                                "Project: ${config.firebaseProjectId.ifBlank { "Firebase Cloud" }}"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.testTag("toggle_server_settings_button")
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (expanded) "Collapse server settings" else "Expand server settings"
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    val opened = ServerConfigStore.openUpdateLink(context, config.updateLink)
+                    if (!opened) {
+                        val msg = "Enter a valid https:// update link first."
+                        statusNotice = msg
+                        onStatusMessage(msg)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("open_apk_update_link_button"),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Check / Download Latest APK")
+            }
+
+            if (expanded) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(
+                    text = "Active Database: ${config.activeDatabaseId}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                OutlinedTextField(
+                    value = dbIdInput,
+                    onValueChange = { dbIdInput = it.take(128) },
+                    label = { Text("Custom Firestore Database ID (optional)") },
+                    placeholder = { Text("Leave blank for built-in default") },
+                    supportingText = {
+                        Text("Switch database ID live without reinstalling the APK (e.g., (default) or a named database).")
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("custom_firestore_db_input")
+                )
+
+                OutlinedTextField(
+                    value = updateUrlInput,
+                    onValueChange = { updateUrlInput = it.take(300) },
+                    label = { Text("APK Download / Release Link") },
+                    placeholder = { Text(ServerConfigStore.DEFAULT_UPDATE_URL) },
+                    supportingText = {
+                        Text("Point to GitHub Releases or Google Drive. Installing a newer APK signed with the same key keeps all local sadhana data.")
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("apk_update_link_input")
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            config = ServerConfigStore.resetToDefault(context)
+                            dbIdInput = config.customDatabaseId
+                            updateUrlInput = config.updateLink
+                            val msg = "Restored default cloud server & update link."
+                            statusNotice = msg
+                            onStatusMessage(msg)
+                        },
+                        modifier = Modifier.testTag("reset_server_settings_button")
+                    ) {
+                        Text("Reset Default")
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            config = ServerConfigStore.saveConfig(context, dbIdInput, updateUrlInput)
+                            val msg = "Server & update settings saved (active immediately)."
+                            statusNotice = msg
+                            onStatusMessage(msg)
+                        },
+                        modifier = Modifier
+                            .height(48.dp)
+                            .testTag("save_server_settings_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Save Settings")
+                    }
+                }
+            }
+
+            statusNotice?.let { msg ->
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
