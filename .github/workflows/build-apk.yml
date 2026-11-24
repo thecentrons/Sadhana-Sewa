@@ -34,6 +34,37 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
+      - name: Prepare Firebase google-services.json
+        shell: bash
+        env:
+          SECRET_GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -f app/google-services.json ]; then
+            echo "Using app/google-services.json from repository."
+          elif [ -n "$SECRET_GOOGLE_SERVICES_JSON" ]; then
+            # Accept either raw JSON (starts with '{') or base64-encoded JSON
+            TRIMMED=$(printf '%s' "$SECRET_GOOGLE_SERVICES_JSON" | tr -d '[:space:]')
+            if [[ "$TRIMMED" == \{* ]]; then
+              printf '%s\n' "$SECRET_GOOGLE_SERVICES_JSON" > app/google-services.json
+            else
+              printf '%s' "$TRIMMED" | base64 -d > app/google-services.json
+            fi
+            echo "Restored app/google-services.json from GitHub Secret GOOGLE_SERVICES_JSON."
+          else
+            {
+              echo "### Missing Firebase Configuration (app/google-services.json)"
+              echo "AI Studio excludes \`app/google-services.json\` when pushing to GitHub."
+              echo ""
+              echo "**Fix (takes 30 seconds):**"
+              echo "1. Open your project in Firebase Console -> Project Settings -> Download \`google-services.json\` (or copy it from \`app/google-services.json\` in AI Studio's code editor)."
+              echo "2. In GitHub, go to **Settings -> Secrets and variables -> Actions -> New repository secret**."
+              echo "3. Name: \`GOOGLE_SERVICES_JSON\` and paste the entire JSON content as the value."
+              echo "4. Re-run this workflow!"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "ERROR: app/google-services.json is missing. Add GitHub Secret GOOGLE_SERVICES_JSON and re-run."
+            exit 1
+          fi
+
       - name: Prepare signing keystore
         shell: bash
         env:
@@ -43,10 +74,10 @@ jobs:
             base64 -d debug.keystore.base64 > debug.keystore
             echo "KEYSTORE_SOURCE=repo (Firebase-registered)" >> "$GITHUB_ENV"
           elif [ -n "$SECRET_KEYSTORE_B64" ]; then
-            echo "$SECRET_KEYSTORE_B64" | base64 -d > debug.keystore
+            printf '%s' "$SECRET_KEYSTORE_B64" | tr -d '[:space:]' | base64 -d > debug.keystore
             echo "KEYSTORE_SOURCE=github-secret (Firebase-registered)" >> "$GITHUB_ENV"
           else
-            echo "debug.keystore.base64 not found in repo; generating fallback debug keystore..."
+            echo "debug.keystore.base64 not found; generating fallback debug keystore..."
             keytool -genkeypair -v \
               -keystore debug.keystore \
               -storepass android \
@@ -62,15 +93,11 @@ jobs:
           SHA1=$(keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -E "SHA1:" | awk '{print $2}')
           SHA256=$(keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -E "SHA256:" | awk '{print $2}')
           {
-            echo "### Signing Keystore Info"
-            echo "- **Source**: $KEYSTORE_SOURCE"
+            echo "### Build & Signing Info"
+            echo "- **google-services.json**: Present"
+            echo "- **Keystore Source**: $KEYSTORE_SOURCE"
             echo "- **SHA-1**: \`$SHA1\`"
             echo "- **SHA-256**: \`$SHA256\`"
-            if [ -f app/google-services.json ]; then
-              echo "- **google-services.json**: Present"
-            else
-              echo "- **google-services.json**: Missing (Firebase Sign-In will require adding google-services.json)"
-            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build Debug APK
